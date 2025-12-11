@@ -1,0 +1,13 @@
+visualization:
+    explore_vae:
+        wandb_name: 0u5us4g7
+        checkpoint: shimmer-meta-0u5us4g7/epoch=156.ckpt
+    explore_gw:
+        # wandb_name: zdufxid0
+        checkpoint: shimmer-meta-cpcjzmp8/epoch=147.ckpt
+        domain: v_latents
+
+# Path where we save checkpoints
+default_root_dir: "/mnt/datashare/yelhelw/checkpoints"
+
+

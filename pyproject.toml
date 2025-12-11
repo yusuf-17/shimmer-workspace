@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shimmer-metaworld"
+version = "0.1.0"
+description = "Multimodal grounding with action using Metaworld"
+authors = [
+    { name = "Yusuf ELHELW" },
+]
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+package-dir = { "" = "." }
+
+[tool.setuptools.packages.find]
+where = ["shimmer_metaworld"]

@@ -15,4 +15,4 @@ dynamic = ["dependencies"]
 package-dir = { "" = "." }
 
 [tool.setuptools.packages.find]
-where = ["shimmer_metaworld"]
+where = ["."]

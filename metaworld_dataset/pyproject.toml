@@ -1,0 +1,16 @@
+[project]
+name = "metaworld-dataset"
+version = "0.6.0.dev"
+description = "A light GLoW"
+license = { file = "LICENSE" }
+readme = "README.md"
+authors = [
+    { name = "Benjamin Devillers", email="bdvllrs@gmail.com" },
+]
+
+
+[tool.setuptools]
+package-dir = { "" = "." }
+
+[tool.setuptools.packages.find]
+where = ["."]

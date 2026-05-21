@@ -58,6 +58,7 @@ class DomainModuleVariant(Enum):
     v_latents_unpaired = (DomainType.v_latents, "unpaired")
 
     act = (DomainType.act,"default")
+    tact = (DomainType.tact,"default")
 
     # Text modules
     # ------------
@@ -174,6 +175,7 @@ class Training(BaseModel):
     fast_dev_run: bool = False
     # number of training steps
     max_steps: int = 200_000
+    max_epochs: int | None = None  # you can use either max_epochs or max_steps
     enable_progress_bar: bool = True
 
     # see https://lightning.ai/docs/pytorch/stable/common/trainer.html#precision

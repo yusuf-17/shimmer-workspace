@@ -1,7 +1,7 @@
 from pathlib import Path
 from setuptools import setup
 
-metaworld_dataset_path: str = (Path(__file__).parent / "packages/metaworld-dataset").resolve().as_uri()
+metaworld_dataset_path: str = (Path(__file__).parent / "metaworld_dataset").resolve().as_uri()
 
 
 setup(

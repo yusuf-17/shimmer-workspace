@@ -15,13 +15,16 @@ from shimmer_metaworld.modules.domains.attribute import (
     ActionLegacyDomainModule,
     AttributeWithUnpairedDomainModule,
 )
-from shimmer_metaworld.modules.domains.text import GRUTextDomainModule, Text2Attr
 from shimmer_metaworld.modules.domains.visual import (
     VisualDomainModule,
     VisualLatentDomainModule,
     VisualLatentDomainWithUnpairedModule,
 )
 
+from transformers import AutoImageProcessor, AutoModel
+from transformers.image_utils import load_image
+
+from shimmer_metaworld.modules.domains.dinov2_checkpoint import DINOv2FeatureExtractor
 
 def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
     domain_checkpoint = Path(domain.checkpoint_path)
@@ -37,15 +40,7 @@ def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
             )
 
         case DomainModuleVariant.v_latents:
-            migrate_model(
-                domain_checkpoint,
-                PROJECT_DIR / "shimmer_metaworld" / "migrations" / "visual_mod",
-            )
-            v_module = VisualDomainModule.load_from_checkpoint(
-                domain_checkpoint, **domain.args
-            )
-            module = VisualLatentDomainModule(v_module)
-
+            module = DINOv2FeatureExtractor()
         case DomainModuleVariant.v_latents_unpaired:
             migrate_model(
                 domain_checkpoint,
@@ -64,6 +59,8 @@ def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
             module = AttributeDomainModule.load_from_checkpoint(
                 domain_checkpoint, **domain.args
             )
+        case DomainModuleVariant.tact:
+            module = DINOv2FeatureExtractor()
         case DomainModuleVariant.act:
             module = ActionLegacyDomainModule()
         

@@ -4,11 +4,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from metaworld_dataset.domain import Attribute, Text, Action
-from metaworld_dataset.text import composer
-from simple_shapes_dataset.text.utils import (
-    choices_from_structure_categories,
-    structure_category_from_choice,
-)
+
 
 
 class NormalizeAttributes:

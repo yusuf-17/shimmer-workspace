@@ -6,6 +6,7 @@ from PIL.Image import Image
 import numpy as np
 from shimmer.modules import DomainModule, LossOutput
 import torch.nn.functional as F
+from typing import Any
 
 class DINOv2FeatureExtractor(DomainModule):
     """
@@ -13,7 +14,7 @@ class DINOv2FeatureExtractor(DomainModule):
     Wraps AutoImageProcessor and AutoModel for seamless preprocessing and inference.
     """
 
-    def __init__(self, model_name: str = "dinov2-base", device: str = None):
+    def __init__(self, model_name: str = "facebook/dinov2-base", device: str = None):
         """
         Initialize the DINOv2 feature extractor.
 

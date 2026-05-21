@@ -32,7 +32,7 @@ class DomainType(Enum):
     act = DomainDesc("act", "act")
     raw_text = DomainDesc("t", "raw_text")  # raw text representations (str)
     t = DomainDesc("t", "t")  # loads BERT representations of the raw text
-
+    tact = DomainDesc("tact", "tact")  
 
 # TODO: Consider handling CPU usage
 # with a workaround in:

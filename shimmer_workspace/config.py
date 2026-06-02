@@ -165,7 +165,7 @@ class Training(BaseModel):
     `train_gw.yaml`).
     """
 
-    batch_size: int = 128
+    batch_size: int = 1024
     num_workers: int = 8
     devices: int = 1  # num of devices (gpus) to use
     accelerator: str = "gpu"

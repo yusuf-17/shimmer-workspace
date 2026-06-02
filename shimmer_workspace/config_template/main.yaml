@@ -1,12 +1,12 @@
 # Path where we save checkpoints
-default_root_dir: "/mnt/datashare/yelhelw/"
+default_root_dir: "/mnt/datashare/yelhelw/checkpoints"
 
 
 dataset:
     # Path to the simple-shapes-dataset
-    path: "./simple_shapes_dataset"
+    path: "/mnt/datashare/yelhelw/complex_dataset_V3"
 
-
+    
 wandb:
     enabled: True  # Set to true to log your training to wandb
     save_dir: "/mnt/datashare/yelhelw/wandb"
@@ -45,25 +45,26 @@ domain_proportions:
 
 
 # Selected domains for this run
-domains:
-    - checkpoint_path: "pretrained/domain_v.ckpt"
-      domain_type: 'v_latents'
-    - checkpoint_path: "pretrained/domain_attr.ckpt"
-      domain_type: 'attr'
-    - checkpoint_path: "/mnt/datashare/yelhelw/checkpoints/shimmer-meta-7zc4r0xq/epoch=63.ckpt"
-      domain_type: 'act'
+#domains:
+#    - checkpoint_path: "pretrained/domain_v_pov.ckpt"
+#      domain_type: 'v_latents'
+#    - checkpoint_path: "pretrained/domain_attr.ckpt"
+#      domain_type: 'attr'
+#    - checkpoint_path: "pretrained/domain_act.ckpt"
+#      domain_type: 'act'
 
 
 global_workspace:
     # Dimension of the global workspace
-    latent_dim: 12  
+    latent_dim: 12
 
     # Coefficients of the various losses
     loss_coefficients:
-        cycles: 1.0
-        contrastives: 0.1
+        cycles: 0.1
+        contrastives: 0.5
         demi_cycles: 1.0
         translations: 1.0
+        fused: 0.1
 
     # Global Workspace encoder settings
     encoders:
@@ -76,15 +77,21 @@ global_workspace:
         # Number of layers - 2 additional linear layer that will always be added 
         # (the total will be n_layers + 2).
         n_layers:
-            v_latents: 3
-            attr: 3
-            act: 3
+            v_latents: 2
+            attr: 2
+            act: 2
 
     # Global Workspace decoder settings
     # The comments are the same as for the encoders
     decoders:
-        hidden_dim: 32
-        n_layers: 3
+        hidden_dim: 
+            v_latents: 32
+            attr: 32
+            act: 32
+        n_layers: 
+            v_latents: 2
+            attr: 2
+            act: 2
       
 
 

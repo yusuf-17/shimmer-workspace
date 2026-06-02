@@ -6,6 +6,7 @@ from shimmer import LossOutput
 from shimmer.modules.domain import DomainModule
 from shimmer.modules.vae import VAE, gaussian_nll, kl_divergence_loss
 from torch.nn.functional import mse_loss
+from torch.nn import MSELoss
 from torch.optim.lr_scheduler import OneCycleLR
 
 from shimmer_metaworld import LOGGER
@@ -16,7 +17,7 @@ class VisualDomainModule(DomainModule):
     def __init__(
         self,
         num_channels: int = 3,
-        latent_dim: int = 16,
+        latent_dim: int = 32,
         ae_dim: int = 1028,
         beta: float = 0.1,
         optim_lr: float = 1e-3,
@@ -73,10 +74,10 @@ class VisualDomainModule(DomainModule):
         # this calles model.__call__(x)  since it inherets from nn.Module
         # which internally runs: vae.forward(x)
         (mean, logvar), reconstruction = self.vae(x)
-
-        #divide losses by batch_size
-        reconstruction_loss = mse_loss(reconstruction, x, reduction="mean")
-        kl_loss = kl_divergence_loss(mean, logvar)
+        
+       # reconstruction_loss = mse_loss(reconstruction, x, reduction="sum") / x.size(0)
+        reconstruction_loss = mse_loss(reconstruction, x, reduction="sum") 
+        kl_loss = kl_divergence_loss(mean, logvar) 
 
         total_loss = reconstruction_loss + self.vae.beta * kl_loss
 

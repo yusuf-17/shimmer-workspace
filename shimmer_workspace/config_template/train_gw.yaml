@@ -7,34 +7,33 @@ training:
         end_lr: 8e-4
         pct_start: 0.2
 
-    max_steps: 500000
+    max_steps: 100000
 
 logging:
-    log_val_medias_every_n_epochs: 50
-    log_train_medias_every_n_epochs: 50
+    log_val_medias_every_n_epochs: 20
+    log_train_medias_every_n_epochs: 20
     filter_images:
-        - pred_trans_attr_to_attr
-        - pred_trans_act_to_act
-        - pred_trans_v_latents_to_v_latents
+#        - pred_trans_attr_to_attr
+#        - pred_trans_act_to_act
+#        - pred_trans_v_latents_to_v_latents
         - pred_trans_attr_to_v_latents
-        - pred_trans_attr_to_act
+#        - pred_trans_attr_to_act
         - pred_trans_act_to_v_latents
-        - pred_trans_act_to_attr
-        - pred_trans_v_latents_to_attr
-        - pred_trans_v_latents_to_act
-        - pred_cycle_v_latents_to_attr
-        - pred_cycle_v_latents_to_act
-        - pred_cycle_act_to_attr
-        - pred_cycle_act_to_v_latents
-        - pred_cycle_attr_to_v_latents
-        - pred_cycle_attr_to_act
+#        - pred_trans_act_to_attr
+#        - pred_trans_v_latents_to_attr
+#        - pred_trans_v_latents_to_act
+#        - pred_cycle_v_latents_to_attr
+#        - pred_cycle_v_latents_to_act
+#        - pred_cycle_act_to_attr
+#        - pred_cycle_act_to_v_latents
+#        - pred_cycle_attr_to_v_latents
+#        - pred_cycle_attr_to_act
 default_root_dir: "~/shimmer-metaworld/"
 domains:
     - checkpoint_path: "#{default_root_dir}/pretrained/domain_attr.ckpt"
       domain_type: attr
-      args:
-          n_unpaired: "#{domain_data_args.attr.n_unpaired}"
-    - checkpoint_path: "#{default_root_dir}/pretrained/domain_v.ckpt"
+    - checkpoint_path: "/mnt/datashare/yelhelw/checkpoints/shimmer-meta-01fjh3xv/epoch=30.ckpt"  
+    #- checkpoint_path: "/mnt/datashare/yelhelw/checkpoints/shimmer-meta-exsh3uns/epoch=29.ckpt"
       domain_type: v_latents
     - checkpoint_path: "#{default_root_dir}/pretrained/domain_act.ckpt"
       domain_type: act
@@ -48,7 +47,7 @@ domain_data_args:
 domain_proportions: 
     -   domains: ["attr"]
         proportion: 1.0
-    -   domains: ["v"]
+    -   domains: ["v_latents"]
         proportion: 1.0
     -   domains: ["v", "attr"]
         proportion: 1.0

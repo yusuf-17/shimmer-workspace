@@ -161,7 +161,6 @@ class MetaworldDataModule(LightningDataModule):
         assert split in ("train", "val", "test")
 
         domains = self.domains
-        
         if self._requires_aligned_dataset():
             if self.seed is None:
                 raise ValueError("Seed must be provided when using aligned dataset")

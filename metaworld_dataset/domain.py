@@ -8,7 +8,7 @@ from typing import Any, Generic, NamedTuple, TypedDict, TypeVar
 import numpy as np
 import torch
 from PIL import Image
-
+import math
 
 @dataclass(frozen=True)
 class DomainDesc:
@@ -90,12 +90,8 @@ class MetaworldImages(DataDomain):
 
         self.dataset_path = Path(dataset_path)
         self.split = split
-        self.image_path = (self.dataset_path / self.split).resolve()
-        #TODO reformat the folder so it has png indices so we can go back to the normal index
-        self.image_files = sorted(
-        self.image_path.glob("*.png"),
-        key=lambda f: int(f.stem.split("_")[-1])  # sort by the zero-padded number
-        )
+        self.image_path = Path(self.dataset_path / self.split /"vision")
+
         self.transform = transform
         self.additional_args = additional_args
         self._dataset_size: int | None = None
@@ -123,8 +119,7 @@ class MetaworldImages(DataDomain):
         Returns:
             A PIL image at the given index.
         """
-        path = self.image_files[index]
-        #path = self.image_path / f"{index}.png"
+        path = self.image_path / f"{index:06d}.png"
         with Image.open(path) as image:
             image = image.convert("RGB")
 
@@ -230,8 +225,13 @@ class MetaworldAttributes(DataDomain):
         self.dataset_path = Path(dataset_path).resolve()
         self.split = split
         self.labels: torch.Tensor = torch.from_numpy(
-            np.load(self.dataset_path / f"attributes_{split}.npy")
+            np.load(self.dataset_path / f"attributes_{split}.npy")[:,:13]
         )
+
+        self.train = torch.from_numpy(np.load(self.dataset_path / f"attributes_train.npy")[:,:13])
+        self.mean = torch.mean(self.train, dim=0)
+        self.stdv = torch.std(self.train, dim=0)
+       
         self.transform = transform
 
         default_args = AttributesAdditionalArgs(n_unpaired=0)
@@ -239,18 +239,6 @@ class MetaworldAttributes(DataDomain):
         self.dataset_size = self.labels.size(0)
 
         self.unpaired = None
-        if self.additional_args["n_unpaired"] >= 1:
-            if not (self.dataset_path / f"{split}_unpaired.npy").exists():
-                raise ValueError(
-                    "Asking for an unpaired attribute, "
-                    "but there is no unpaired label file."
-                )
-            self.unpaired = torch.from_numpy(
-                np.load(self.dataset_path / f"{split}_unpaired.npy")[
-                    :, 2 : 2 + self.additional_args["n_unpaired"]
-                ]
-            ).float()
-
     def __len__(self) -> int:
         return self.dataset_size
 
@@ -259,24 +247,15 @@ class MetaworldAttributes(DataDomain):
         Returns:
             An Attribute named tuple at the given index.
         """
-        label = self.labels[index]
-        unpaired = self.unpaired[index] if self.unpaired is not None else None
-        #we define an Attributes named tuple to be able to preprocess each part of the Attributes
-        #seperately then they are combined with transform attribute_to_tensor 
-        item = Attribute(
-            proprio_x=label[0],
-            proprio_y=label[1],
-            proprio_z=label[2],
-            proprio_gripper=label[3],
-            ball = label[4:11],
-            wall = label[11:14],
-            soccer_goal=label[14:17],
-            unpaired=self.unpaired,
-            )
+        # Clone to avoid in-place modification of the original data
+        label = self.labels[index].clone()
+        #NORMALIZE BETWEEN -1 AND 1
+        for x in range(len(label)):
+            label[x] = (label[x] - self.mean[x]) / self.stdv[x]
 
-        if self.transform is not None:
-            return self.transform(item)
-        return item.float()
+        #if self.transform is not None:
+        #    return self.transform(item)
+        return label.float()
 
 
 class MetaworldActions(DataDomain):
@@ -294,6 +273,16 @@ class MetaworldActions(DataDomain):
         self.labels: torch.Tensor = torch.from_numpy(
             np.load(self.dataset_path / f"actions_{split}.npy")
         )
+        self.combin_index = np.load(self.dataset_path / f"combin_task_index.npy",allow_pickle=True)[0]
+        self.labels = np.clip(self.labels, -10, 10)
+
+        self.train = np.clip(torch.from_numpy(
+        np.load(self.dataset_path / f"actions_train.npy")), -10, 10)
+        self.mean = torch.mean(self.train[:self.combin_index,:], dim=0)
+        self.stdv = torch.std(self.train[:self.combin_index,:], dim=0)
+
+        print("new",self.mean,self.stdv)
+        #self.labels = np.clip(self.labels, -1, 1)
         self.transform = transform
 
         default_args = AttributesAdditionalArgs(n_unpaired=0)
@@ -301,17 +290,6 @@ class MetaworldActions(DataDomain):
         self.dataset_size = self.labels.size(0)
 
         self.unpaired = None
-        if self.additional_args["n_unpaired"] >= 1:
-            if not (self.dataset_path / f"{split}_unpaired.npy").exists():
-                raise ValueError(
-                    "Asking for an unpaired attribute, "
-                    "but there is no unpaired label file."
-                )
-            self.unpaired = torch.from_numpy(
-                np.load(self.dataset_path / f"{split}_unpaired.npy")[
-                    :, 2 : 2 + self.additional_args["n_unpaired"]
-                ]
-            ).float()
 
     def __len__(self) -> int:
         return self.dataset_size
@@ -319,22 +297,14 @@ class MetaworldActions(DataDomain):
     def __getitem__(self, index: int):
         """
         Returns:
-            An Attribute named tuple at the given index.
+            An Action tensor at the given index.
         """
-        label = self.labels[index]
-        unpaired = self.unpaired[index] if self.unpaired is not None else None
-
-        item = Action(
-            dis_x=label[0],
-            dis_y = label[1],
-            dis_z=label[2],
-            gripper = label[3],
-            unpaired= unpaired
-        )
-
-        if self.transform is not None:
-            return self.transform(item)
-        return item.float()
+        # Clone to avoid in-place modification of the original data
+        label = self.labels[index].clone()
+        #NORMALIZE BETWEEN -1 AND 1
+        for x in range(len(label)):
+            label[x] = (label[x] - self.mean[x]) / self.stdv[x]
+        return label.float()
 
 class Choice(NamedTuple):
     structure: int

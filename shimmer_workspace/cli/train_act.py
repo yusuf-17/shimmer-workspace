@@ -56,7 +56,7 @@ def train_act_domain(
     pl.seed_everything(config.seed, workers=True)
 
     data_module = MetaworldDataModule(
-        os.path.abspath('/mnt/datashare/yelhelw/'),
+        os.path.abspath('/mnt/datashare/yelhelw/dataset'),
         get_default_domains(["act"]),
         {frozenset(["act"]): 1.0},
         batch_size=128,
@@ -71,9 +71,9 @@ def train_act_domain(
     for b in np.arange(0.05,0.25,0.05,dtype=np.float32):
         print("########",b)
         attr_domain_module = ActionDomainModule(
-        latent_dim=4,
-        hidden_dim=config.domain_modules.attribute.hidden_dim,
-        beta=b,
+        latent_dim=1,
+        hidden_dim=32,
+        beta=0.005,
         optim_lr=config.training.optim.lr,
         optim_weight_decay=config.training.optim.weight_decay,
         scheduler_args={
@@ -84,14 +84,6 @@ def train_act_domain(
 
         callbacks: list[pl.Callback] = [
             LearningRateMonitor(logging_interval="step"),
-            LogActionsCallback(
-                val_samples,
-                log_key="images/val_act",
-                mode="val",
-                every_n_epochs=config.logging.log_val_medias_every_n_epochs,
-                #image_size=32,
-                ncols=8,
-            ),
             LogActionsCallback(
                 train_samples,
                 log_key="images/train_act",
@@ -109,7 +101,7 @@ def train_act_domain(
             if config.title is not None:
                 run_name = config.title
             else:
-                run_name = f"act_vae_z={17}_b={b:.2f}"
+                run_name = f"act_vae_z=1_b={b:.2f}"
             wandb_kwargs: dict[str, Any] = {}
             if config.desc is not None:
                 wandb_kwargs["notes"] = config.desc

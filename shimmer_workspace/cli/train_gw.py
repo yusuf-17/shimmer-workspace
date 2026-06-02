@@ -13,6 +13,7 @@ from lightning.pytorch.callbacks import (
     RichProgressBar,
 )
 import pytorch_lightning as pl
+import wandb
 from lightning.pytorch.loggers.wandb import WandbLogger
 from shimmer import (
     ContrastiveLossType,
@@ -35,7 +36,6 @@ from torch.optim.optimizer import Optimizer
 
 from shimmer_metaworld import DEBUG_MODE, LOGGER,PROJECT_DIR
 from shimmer_metaworld.config import load_config
-from shimmer_metaworld.dataset.pre_process import TokenizeCaptions
 from shimmer_metaworld.logging import LogGWImagesCallback
 from shimmer_metaworld.modules.contrastive_loss import VSEPPContrastiveLoss
 from shimmer_metaworld.modules.domains import load_pretrained_domains
@@ -55,9 +55,14 @@ class ProfilerCallback(Callback):
             if global_step % self.every_n_steps == 0 and global_step > 0:
                 print(f"\n=== Profiler summary at step {global_step} ===")
                 print(trainer.profiler.summary())
-
+#For sweeps, contrastive_coef and fused_coef can be passed, others are set at 1
 def train_gw(
     config_path: Path,
+    contrast_coef,
+    demi_coef,
+    trans_coef,
+    cycle_coef,
+    z,
     debug_mode: bool | None = None,
     log_config: bool = False,
     extra_config_files: list[str] | None = None,
@@ -87,7 +92,7 @@ def train_gw(
     )
     print(config.domains)
     data_module = MetaworldDataModule(
-        '/mnt/datashare/yelhelw/',
+        "/mnt/datashare/yelhelw/complex_dataset_V3",
         domain_classes,
         config.domain_proportions,
         batch_size=config.training.batch_size,
@@ -101,7 +106,7 @@ def train_gw(
 
     domain_modules, gw_encoders, gw_decoders = load_pretrained_domains(
         config.domains,
-        config.global_workspace.latent_dim,
+        z,
         config.global_workspace.encoders.hidden_dim,
         config.global_workspace.encoders.n_layers,
         config.global_workspace.decoders.hidden_dim,
@@ -109,7 +114,6 @@ def train_gw(
         is_linear=config.global_workspace.linear_domains,
         bias=config.global_workspace.linear_domains_use_bias,
     )
-    #print(domain_modules, gw_encoders, gw_decoders)
 
     contrastive_fn: ContrastiveLossType | None = None
     if config.global_workspace.vsepp_contrastive_loss:
@@ -131,6 +135,12 @@ def train_gw(
             / config.training.optim.end_lr,
         )
 
+    loss_coefficients = config.global_workspace.loss_coefficients
+    loss_coefficients['contrastives'] = contrast_coef
+    loss_coefficients['demi_cycles'] = demi_coef
+    loss_coefficients['translations'] = trans_coef
+    loss_coefficients['cycles'] = cycle_coef
+    loss_coefficients.pop('fused', None)
     module: GlobalWorkspaceBase
     gw_type: str
     if config.global_workspace.use_fusion_model:
@@ -139,11 +149,11 @@ def train_gw(
             domain_modules,
             gw_encoders,
             gw_decoders,
-            config.global_workspace.latent_dim,
-            config.global_workspace.loss_coefficients,
-            config.global_workspace.selection_temperature,
-            config.training.optim.lr,
-            config.training.optim.weight_decay,
+            z,
+            loss_coefficients,
+            selection_temperature=config.global_workspace.selection_temperature,
+            optim_lr=config.training.optim.lr,
+            optim_weight_decay=config.training.optim.weight_decay,
             learn_logit_scale=config.global_workspace.learn_logit_scale,
             contrastive_loss=contrastive_fn,
             scheduler=get_scheduler,
@@ -167,88 +177,35 @@ def train_gw(
 
     train_samples = data_module.get_samples("train", 32,offset=1)
     val_samples = data_module.get_samples("val", 32,offset=1)
-    #test_samples = data_module.get_samples("test", 32)
-
+    
+    print(domains for domains in train_samples)
     for domains in val_samples:
         for domain in domains:
+            train_samples[frozenset([domain])] = {domain: train_samples[domains][domain]} 
             val_samples[frozenset([domain])] = {domain: val_samples[domains][domain]}
             #test_samples[frozenset([domain])] = {domain: test_samples[domains][domain]}
         break
     
-    # helper
-    '''
-    def to_float32(obj):
-        if torch.is_tensor(obj):
-            if obj.dtype.is_floating_point:
-                return obj.to(torch.float32)
-            return obj
-        if isinstance(obj, dict):
-            return {k: to_float32(v) for k, v in obj.items()}
-        if isinstance(obj, (list, tuple)):
-            return type(obj)(to_float32(x) for x in obj)
-        return obj
-    
-    train_samples = to_float32(train_samples)
-    '''
-    def find_double_tensors(obj, prefix="root"):
-        if torch.is_tensor(obj):
-            if obj.dtype == torch.float64:
-                print(f"{prefix}: dtype={obj.dtype} device={obj.device} shape={tuple(obj.shape)}")
-        elif isinstance(obj, dict):
-            for k,v in obj.items():
-                find_double_tensors(v, f"{prefix}.{k}")
-        elif isinstance(obj, (list, tuple)):
-            for i,v in enumerate(obj):
-                find_double_tensors(v, f"{prefix}[{i}]")
-
-    # call after model creation and in training_step (on batch, outputs, loss, optimizer state)
-    #print(find_double_tensors(train_samples))
-
-    
-    
-    callbacks = []
     callbacks = [
         LearningRateMonitor(logging_interval="step"),
-
     ]
 
-    if config.ood_seed is not None:
-        train_samples_ood = data_module.get_samples("train", 32, ood=True)
-        val_samples_ood = data_module.get_samples("val", 32, ood=True)
-        #test_samples_ood = data_module.get_samples("test", 32, ood=True)
-
-        for domains in val_samples_ood:
-            for domain in domains:
-                val_samples_ood[frozenset([domain])] = {
-                    domain: val_samples_ood[domains][domain]
-                }
-                '''
-                test_samples_ood[frozenset([domain])] = {
-                    domain: test_samples_ood[domains][domain]
-                }
-                '''
-            break
-        callbacks.extend(
-            [
-                '''
-                LogGWImagesCallback(
-                    val_samples_ood,
-                    log_key="images/val/ood",
-                    mode="val",
-                    every_n_epochs=config.logging.log_val_medias_every_n_epochs,
-                    filter=config.logging.filter_images,
-                ),
-                LogGWImagesCallback(
-                    train_samples_ood,
-                    log_key="images/train/ood",
-                    mode="train",
-                    every_n_epochs=config.logging.log_train_medias_every_n_epochs,
-                    filter=config.logging.filter_images,
-                ),
-                '''
-            ]
-        )
-
+    '''
+    LogGWImagesCallback(
+    val_samples,
+    log_key="images/val",
+    mode="val",
+    every_n_epochs=config.logging.log_val_medias_every_n_epochs,
+    filter=config.logging.filter_images,
+    ),
+    LogGWImagesCallback(
+        train_samples,
+        log_key="images/train",
+        mode="train",
+        every_n_epochs=config.logging.log_train_medias_every_n_epochs,
+        filter=config.logging.filter_images,
+    ),
+    '''
     if config.training.enable_progress_bar:
         callbacks.append(RichProgressBar())
         #callbacks.append(ProfilerCallback(every_n_steps=200))
@@ -257,7 +214,7 @@ def train_gw(
         if config.title is not None:
             run_name = config.title
         else:
-            run_name = f"{gw_type}_z={config.global_workspace.latent_dim}"
+            run_name = f"{gw_type}_2_mod_b=1.5,z={z}_con={contrast_coef}_demi={demi_coef}_trans={trans_coef}_cycle={cycle_coef}"
         wandb_kwargs: dict[str, Any] = {}
         if config.desc is not None:
             wandb_kwargs["notes"] = config.desc
@@ -286,7 +243,6 @@ def train_gw(
                 ),
             ]
         )
-    print(callbacks)
     set_float32_matmul_precision(config.training.float32_matmul_precision)
 
     trainer = Trainer(
@@ -302,50 +258,28 @@ def train_gw(
     )
 
     trainer.fit(module, data_module)
-    trainer.validate(module, data_module, "best")
+    #trainer.validate(module, data_module, "best")
     #trainer.test(module, data_module, "best")
+    wandb.finish()
+
 if __name__ == "__main__":
-    train_gw(PROJECT_DIR / "shimmer_metaworld"/ "config_template")
-'''
-@click.command(
-    "gw",
-    context_settings={
-        "ignore_unknown_options": True,
-        "allow_extra_args": True,
-    },
-    help="Train the Global Workspace",
-)
-@click.option(
-    "--config_path",
-    "-c",
-    default="./config",
-    type=click.Path(exists=True, dir_okay=True, file_okay=False, path_type=Path),  # type: ignore
-)
-@click.option("--debug", "-d", is_flag=True, default=None)
-@click.option("--log_config", is_flag=True, default=False)
-@click.option(
-    "--extra_config_files",
-    "-e",
-    multiple=True,
-    type=str,
-    help=(
-        "Additional files to `local.yaml` to load in the config path. "
-        "By default `train_gw.yaml`"
-    ),
-)
-@click.pass_context
-def train_gw_command(
-    ctx: click.Context,
-    config_path: Path,
-    debug: bool | None,
-    log_config: bool,
-    extra_config_files: list[str],
-):
-    return train_gw(
-        config_path,
-        debug,
-        log_config,
-        extra_config_files if len(extra_config_files) else None,
-        ctx.args,
-    )
-'''
+    CLIP = (12,1.0,0,0,0)
+    Kuske = (12,1.0,1.0,2.0,1.0)
+    parameters = [
+        #(16,0.1,1.0,1.0,0.1),
+        #(16,0,1.0,1.0,0.1),
+        #(12,0,1.0,1.0,0.1),
+        (12,0.1,1.0,1.0,0.1),
+        #CLIP,
+    ]
+    for param in parameters:
+        z,c,d,t,cyc = param
+        print(f"Training with contrastive_coef={c}")
+        train_gw(
+            PROJECT_DIR / "shimmer_metaworld"/ "config_template",
+            contrast_coef=c,
+            demi_coef=d,
+            trans_coef=t,
+            cycle_coef=cyc,
+            z = z,
+        )

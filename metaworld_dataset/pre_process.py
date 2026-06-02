@@ -4,27 +4,18 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from metaworld_dataset.domain import Attribute, Text, Action
-from metaworld_dataset.text import composer
-from simple_shapes_dataset.text.utils import (
-    choices_from_structure_categories,
-    structure_category_from_choice,
-)
+
 
 
 class NormalizeAttributes:
     '''
-    def __init__(self, min_size: int = 7, max_size: int = 14, image_size: int = 32):
-        self.min_size = min_size
-        self.max_size = max_size
-        self.scale_size = self.max_size - self.min_size
-
-        self.image_size = image_size
-        self.min_position = self.max_size // 2
-        self.max_position = self.image_size - self.min_position
-        self.scale_position = self.max_position - self.min_position
+    def __init__(self, min, max):
+        self.min = min
+        self.max = max
     '''
     def __call__(self, attr: Attribute) -> Attribute:
         #Normalizes attributes between -1 and 1
+        '''
         wall = attr.wall
         wall[0] /= 0.05
         wall[1] = np.clip(wall[1],-1,1)
@@ -35,37 +26,32 @@ class NormalizeAttributes:
 
         ball = 2*((attr.ball+11)/(1+11)) - 1
         ball = np.clip(ball,-1,1)
+        '''
         
         return Attribute(
-            proprio_x = attr.proprio_x/0.525,
-            proprio_y= 2*((attr.proprio_y-0.348) / (1.025-0.348)) - 1,
-            proprio_z=2*((attr.proprio_z+0.525) / (0.7+0.525)) - 1,
+            proprio_x = attr.proprio_x,
+            proprio_y= attr.proprio_y,
+            proprio_z=attr.proprio_z,
             proprio_gripper=attr.proprio_gripper,
-            ball = ball,
-            wall = wall,
-            soccer_goal = soccer_goal,
+            ball = attr.ball,
+            wall = attr.wall,
+            soccer_goal = attr.soccer_goal,
             unpaired=attr.unpaired,
         )
 
 class NormalizeActions:
     '''
-    def __init__(self, min_size: int = 7, max_size: int = 14, image_size: int = 32):
+    def __init__(self, min_size: int = 7, max_size: int = 14):
         self.min_size = min_size
         self.max_size = max_size
-        self.scale_size = self.max_size - self.min_size
-
-        self.image_size = image_size
-        self.min_position = self.max_size // 2
-        self.max_position = self.image_size - self.min_position
-        self.scale_position = self.max_position - self.min_position
     '''
-    def __call__(self, attr: Attribute) -> Attribute:
+    def __call__(self, act: Action) -> Action:
         return Action(
-            dis_x = np.clip(attr.dis_x,-1,1),
-            dis_y = np.clip(attr.dis_y,-1,1),
-            dis_z = np.clip(attr.dis_z,-1,1),
-            gripper = np.clip(attr.gripper,-1,1),
-            unpaired=attr.unpaired,
+            dis_x = act.dis_x,
+            dis_y = act.dis_y,
+            dis_z = act.dis_z,
+            gripper = act.gripper,
+            unpaired=act.unpaired,
         )
     
 def to_unit_range(x: torch.Tensor) -> torch.Tensor:

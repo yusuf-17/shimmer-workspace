@@ -19,7 +19,7 @@ class RAEEncoder(VAEEncoder):
         self,
         num_channels: int,
         ae_dim: int = 1028,
-        z_dim: int = 16,
+        z_dim: int = 64,
         kernel_dim: int = 4,
         padding: int = 1,
         use_batchnorm: bool = True,
@@ -105,7 +105,7 @@ class RAEDecoder(VAEDecoder):
     def __init__(
         self,
         num_channels: int,
-        z_dim: int = 16,
+        z_dim: int = 64,
         ae_dim: int = 1028,
         kernel_dim: int = 4,
         padding: int = 1,

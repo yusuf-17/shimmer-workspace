@@ -59,7 +59,7 @@ def train_attr_domain(
         os.path.abspath('/mnt/datashare/yelhelw/'),
         get_default_domains(["attr"]),
         {frozenset(["attr"]): 1.0},
-        batch_size=128,
+        batch_size=1028,
         num_workers=8,
     )
 
@@ -70,7 +70,7 @@ def train_attr_domain(
     for b in np.arange(0.05,0.25,0.05,dtype=np.float32):
         print("########",b)
         attr_domain_module = AttributeDomainModule(
-        latent_dim=17,
+        latent_dim=11,
         hidden_dim=config.domain_modules.attribute.hidden_dim,
         beta=b,
         optim_lr=config.training.optim.lr,

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import numpy as np
 import torch
+import torch.nn.functional as F
 import sys
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from metaworld_dataset import (
@@ -20,6 +21,15 @@ from shimmer_metaworld.config import DomainModuleVariant, load_config
 from shimmer_metaworld.modules.domains.pretrained import load_pretrained_module
 from shimmer_metaworld.modules.domains.visual import VisualDomainModule
 
+# Source - https://stackoverflow.com/a/69808279
+# Posted by creiser, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-04-20, License - CC BY-SA 4.0
+
+def force_cudnn_initialization():
+    s = 32
+    dev = torch.device('cuda')
+    torch.nn.functional.conv2d(torch.zeros(s, s, s, s, device=dev), torch.zeros(s, s, s, s, device=dev))
+
 
 def main():
     config = load_config(
@@ -27,13 +37,14 @@ def main():
         load_files=["save_v_latents.yaml"],
         debug_mode=DEBUG_MODE,
     )
+    print(config.dataset.path)
     beta = 1
     additional_transforms: dict[str, list[Callable[[Any], Any]]] = {}
     if config.domain_modules.visual.color_blind:
         additional_transforms["v"] = [color_blind_visual_domain]
 
     data_module = MetaworldDataModule(
-        os.path.abspath('/mnt/datashare/yelhelw/expert_frames_final/'),
+        os.path.abspath(config.dataset.path),
         get_default_domains(["v"]),
         {frozenset(["v"]): 1.0},
         batch_size=config.training.batch_size,
@@ -43,32 +54,36 @@ def main():
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cpu")
     domain_checkpoint = None
     for domain in config.domains:
         print(domain.domain_type)
         if domain.domain_type == DomainModuleVariant.v:
             domain_checkpoint = domain
-
+    
     assert (
         domain_checkpoint is not None
     ), "Please add domain_checkpoint entry in the configuration"
     assert domain_checkpoint.domain_type == DomainModuleVariant.v
-
+    pretrained_module = load_pretrained_module(domain_checkpoint)
+    #dinov2_vitb14 = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
     visual_domain = cast(
         VisualDomainModule,
-        load_pretrained_module(domain_checkpoint),
+        pretrained_module,
     )
     visual_domain.to(device)
     visual_domain.freeze()
 
     data_module.prepare_data()
     data_module.setup()
-
+    
     dataloaders = {
         "train": data_module.train_dataloader(shuffle=False, drop_last=False),
         "val": data_module.val_dataloader(),
     }
 
+    dino_v2 = False
+    b = 1.5
     for split, dataloader in dataloaders.items():
         latents: list[np.ndarray] = []
 
@@ -78,11 +93,20 @@ def main():
                 images = batch[frozenset(["v"])]["v"].to(device)
             else:
                 images = batch[frozenset(["v"])]["v"].to(device)
+            # DINOv2 ViT-B/14 expects spatial dimensions divisible by patch size (14).
+            # Resize to the canonical 224x224 right before the encoder forward pass.
+            if dino_v2 and images.shape[-2:] != (224, 224):
+                images = F.interpolate(
+                    images,
+                    size=(224, 224),
+                    mode="bilinear",
+                    align_corners=False,
+                )
             latent = visual_domain.encode(images)
             latents.append(latent.detach().cpu().numpy())
 
         latent_vectors = np.concatenate(latents, axis=0)
-
+        print(config.dataset.path)
         presaved_path = config.domain_data_args["v_latents"]["presaved_path"]
         Path(f"{config.dataset.path}/saved_latents/{split}/").mkdir(
             parents=True, exist_ok=True
@@ -98,7 +122,7 @@ def main():
                 x = np.linspace(min(latent_vectors[i]),max(latent_vectors[i]),500)
                 y = kde(x)
                 plt.plot(x,y,linewidth=2)
-        plt.savefig(f"latents_{beta}.png")
+        plt.savefig(f"latents_{b}.png")
 
 
 if __name__ == "__main__":

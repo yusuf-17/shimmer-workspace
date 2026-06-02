@@ -13,6 +13,7 @@ from shimmer.modules.vae import (
     gaussian_nll,
     kl_divergence_loss,
 )
+from torch.nn.functional import mse_loss
 from torch import nn
 from torch.optim.lr_scheduler import OneCycleLR
 
@@ -75,7 +76,7 @@ class Decoder(VAEDecoder):
 
 
 class AttributeDomainModule(DomainModule):
-    in_dim = 17
+    in_dim = 13
     
     def __init__(
         self,
@@ -146,7 +147,7 @@ class AttributeDomainModule(DomainModule):
         # which internally runs: vae.forward(x)
         (mean, logvar), reconstruction = self.vae(x.float())
 
-        reconstruction_loss = gaussian_nll(reconstruction, torch.tensor(0), x).sum()
+        reconstruction_loss = mse_loss(reconstruction, x, reduction="mean")
 
         kl_loss = kl_divergence_loss(mean, logvar)
         total_loss = reconstruction_loss + self.vae.beta * kl_loss
@@ -189,7 +190,7 @@ class AttributeDomainModule(DomainModule):
         }
 
 class ActionDomainModule(DomainModule):
-    in_dim = 4
+    in_dim = 1
     
     def __init__(
         self,
@@ -239,7 +240,7 @@ class ActionDomainModule(DomainModule):
     def compute_loss(
         self, pred: torch.Tensor, target: torch.Tensor, raw_target: Any
     ) -> LossOutput:
-        return LossOutput(F.mse_loss(pred, target, reduction="mean"))
+        return LossOutput(F.mse_loss(pred, target, reduction="sum"))
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         return self.vae.encode(x.float())
@@ -260,7 +261,7 @@ class ActionDomainModule(DomainModule):
         # which internally runs: vae.forward(x)
         (mean, logvar), reconstruction = self.vae(x)
 
-        reconstruction_loss = gaussian_nll(reconstruction, torch.tensor(0), x).sum()
+        reconstruction_loss = mse_loss(reconstruction, x, reduction = "sum")
 
         kl_loss = kl_divergence_loss(mean, logvar)
         total_loss = reconstruction_loss + self.vae.beta * kl_loss
@@ -302,93 +303,31 @@ class ActionDomainModule(DomainModule):
             },
         }
     
-class AttributeWithUnpairedDomainModule(DomainModule):
-    in_dim = 11
+class AttributeLegacyDomainModule(DomainModule):
+    latent_dim = 13
 
-    def __init__(
-        self,
-        latent_dim: int,
-        hidden_dim: int,
-        beta: float = 1,
-        coef_categories: float = 1,
-        coef_attributes: float = 1,
-        n_unpaired: int = 1,
-        optim_lr: float = 1e-3,
-        optim_weight_decay: float = 0,
-        scheduler_args: SchedulerArgs | None = None,
-        coef_unpaired: float = 0.5,
-    ):
-        super().__init__(latent_dim + n_unpaired)
-
-        if coef_categories < 0 or coef_categories > 1:
-            raise ValueError("coef_categories should be in [0, 1]")
-        if coef_attributes < 0 or coef_attributes > 1:
-            raise ValueError("coef_attributes should be in [0, 1]")
-        if coef_unpaired < 0 or coef_unpaired > 1:
-            raise ValueError("coef_unpaired should be in [0, 1]")
-
+    def __init__(self):
+        super().__init__(self.latent_dim)
         self.save_hyperparameters()
-        self.paired_dim = latent_dim
-        self.n_unpaired = n_unpaired
-        self.hidden_dim = hidden_dim
-        self.coef_categories = coef_categories
-        self.coef_attributes = coef_attributes
-        self.coef_unpaired = coef_unpaired
-
-        vae_encoder = Encoder(self.hidden_dim, self.latent_dim)
-        vae_decoder = Decoder(self.latent_dim, self.hidden_dim)
-        self.vae = VAE(vae_encoder, vae_decoder, beta)
-
-        self.optim_lr = optim_lr
-        self.optim_weight_decay = optim_weight_decay
-
-        self.scheduler_args = SchedulerArgs(
-            max_lr=optim_lr,
-            total_steps=1,
-        )
-        self.scheduler_args.update(scheduler_args or {})
-
-    def encode(self, x: Sequence[torch.Tensor]) -> torch.Tensor:
-        """
-        x must contains 3 items:
-        - the class
-        - the attributes
-        - the unpaired value
-        """
-        assert len(x) == 3, (
-            "x must have the unpaired value "
-            "(use `attr` instead of `attr_unpaired` otherwise)."
-        )
-        z = self.vae.encode(x)
-        return z
-
-    def decode(self, z: torch.Tensor) -> list[torch.Tensor]:
-        #paired = z[:, : self.paired_dim]
-        #unpaired = z[:, self.paired_dim :]
-        out = list(self.vae.decode(z))
-        #out.append(unpaired)
-        return out
-
-    def forward(self, x: Sequence[torch.Tensor]) -> list[torch.Tensor]:  # type: ignore
-        return self.decode(self.encode(x))
 
     def compute_loss(
         self, pred: torch.Tensor, target: torch.Tensor, raw_target: Any
     ) -> LossOutput:
-        paired_loss = F.mse_loss(
-            pred[:, : self.paired_dim], target[:, : self.paired_dim]
-        )
-        unpaired_loss = F.mse_loss(
-            pred[:, self.paired_dim :], target[:, self.paired_dim :]
-        )
-        total_loss = unpaired_loss + paired_loss
-        return LossOutput(
-            loss=total_loss,
-            metrics={
-                "unpaired": unpaired_loss,
-                "paired": paired_loss,
-            },
-        )
+        pred  = self.decode(pred)
+        target  = self.decode(target)
+
+        loss = F.mse_loss(pred, target, reduction="mean")
+
+        return LossOutput(loss)
+
+    def encode(self, x: Sequence[torch.Tensor]) -> torch.Tensor:
+        return x
+
+    def decode(self, z: torch.Tensor) -> list:
+        return z
+
+    def forward(self, x: Sequence[torch.Tensor]) -> list[torch.Tensor]:  # type: ignore
+        return self.decode(self.encode(x))
 
 
 class ActionLegacyDomainModule(DomainModule):
@@ -406,7 +345,7 @@ class ActionLegacyDomainModule(DomainModule):
 
         loss = F.mse_loss(pred, target, reduction="mean")
 
-        return LossOutput(loss, metrics={"loss_act": loss})
+        return LossOutput(loss)
 
     def encode(self, x: Sequence[torch.Tensor]) -> torch.Tensor:
         return x

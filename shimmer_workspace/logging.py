@@ -15,17 +15,16 @@ from matplotlib.figure import Figure
 import matplotlib.colors as colors
 from PIL import Image
 from shimmer.modules.global_workspace import GlobalWorkspaceBase, GWPredictionsBase
-from simple_shapes_dataset import (
-    UnnormalizeAttributes,
-    tensor_to_attribute,
-)
-from simple_shapes_dataset.cli import generate_image
+#from simple_shapes_dataset import (
+#    UnnormalizeAttributes,
+#    tensor_to_attribute,
+#)
+#from simple_shapes_dataset.cli import generate_image
 from tokenizers.implementations import ByteLevelBPETokenizer
 from torchvision.transforms.functional import to_tensor
 from torchvision.utils import make_grid
 from torch import nn
 from shimmer_metaworld import LOGGER
-from shimmer_metaworld.modules.domains.text import GRUTextDomainModule, Text2Attr
 from shimmer_metaworld.modules.domains.visual import VisualLatentDomainModule
 
 matplotlib.use("Agg")
@@ -198,8 +197,8 @@ def attr_to_image(samples: torch.Tensor) -> torch.Tensor:
         eff_z = s[2]
         gripper = s[3]
         ball_xy = s[4:6]
-        wall_xy = s[11:13]
-        goal_xy = s[14:16]
+        wall_xy = s[7:9]
+        goal_xy = s[9:11]
 
 
         fig = plt.figure()
@@ -306,6 +305,79 @@ def act_to_image(samples: torch.Tensor) -> torch.Tensor:
         plt.close(fig)
         
     return torch.stack(imgs,dim=0)
+
+
+def vector_to_image(samples: torch.Tensor) -> torch.Tensor:
+    """
+    Convert a batch of 4-dim action vectors into images showing displacement arrows.
+
+    Args:
+        samples: (batch_size, 4) tensor with action values [dis_x, dis_y, dis_z, gripper]
+                 Values expected in [-1, 1] range.
+
+    Returns:
+        images: (batch_size, 3, H, W) RGB images
+    """
+    B = samples.shape[0]
+    samples_np = samples.detach().cpu().numpy()
+    
+    # Handle case where only 1 dimension is passed
+    if samples_np.ndim == 1:
+        samples_np = samples_np.reshape(B, -1)
+    
+    n_dims = samples_np.shape[1] if samples_np.ndim > 1 else 1
+
+    imgs = []
+    for i in range(B):
+        s = samples_np[i] if samples_np.ndim > 1 else [samples_np[i]]
+        
+        # Extract available dimensions, default to 0 if not present
+        disp_x = s[0] if n_dims > 0 else 0
+        disp_y = s[1] if n_dims > 1 else 0
+        disp_z = s[2] if n_dims > 2 else 0
+        gripper = s[3] if n_dims > 3 else 0
+
+        fig, ax = plt.subplots(figsize=(4, 4))
+        ax.set_xlim(-1.2, 1.2)
+        ax.set_ylim(-1.2, 1.2)
+        ax.set_aspect("equal", adjustable="box")
+        ax.axhline(y=0, color='lightgray', linestyle='--', linewidth=0.5)
+        ax.axvline(x=0, color='lightgray', linestyle='--', linewidth=0.5)
+        ax.set_title(f"Action Vector", fontsize=10)
+
+        # --- XY displacement arrow (blue) ---
+        if abs(disp_x) > 0.01 or abs(disp_y) > 0.01:
+            ax.arrow(0, 0, disp_x, disp_y,
+                     head_width=0.08, head_length=0.05,
+                     length_includes_head=True, fc='blue', ec='blue', linewidth=2)
+            ax.text(disp_x + 0.05, disp_y + 0.05, f'XY', fontsize=8, color='blue')
+
+        # --- Z displacement arrow (red, shown as vertical from a side point) ---
+        if abs(disp_z) > 0.01:
+            ax.arrow(-0.8, 0, 0, disp_z,
+                     head_width=0.08, head_length=0.05,
+                     length_includes_head=True, fc='red', ec='red', linewidth=2)
+            ax.text(-0.75, disp_z + 0.05, f'Z', fontsize=8, color='red')
+
+        # --- Gripper indicator (green circle, size indicates open/close) ---
+        # gripper: -1 = closed, 1 = open
+        gripper_size = (gripper + 1) / 2 * 150 + 50  # map [-1,1] to [50, 200]
+        gripper_color = 'green' if gripper > 0 else 'orange'
+        ax.scatter(0.8, 0, s=gripper_size, c=gripper_color, marker='o', 
+                   edgecolors='black', linewidths=1, zorder=5)
+        ax.text(0.8, -0.25, f'G:{gripper:.2f}', fontsize=7, ha='center')
+
+        # Add legend
+        ax.text(-1.1, 1.0, f'X:{disp_x:.2f}', fontsize=7, color='blue')
+        ax.text(-1.1, 0.85, f'Y:{disp_y:.2f}', fontsize=7, color='blue')
+        ax.text(-1.1, 0.70, f'Z:{disp_z:.2f}', fontsize=7, color='red')
+
+        image = get_pil_image(fig)
+        img_t = to_tensor(image)
+        imgs.append(img_t)
+        plt.close(fig)
+
+    return torch.stack(imgs, dim=0)
 
 
 #TODO: write actions callback logging images with displacement vectors
@@ -631,7 +703,6 @@ class LogGWImagesCallback(pl.Callback):
         with torch.no_grad():
             latent_groups = pl_module.encode_domains(self.reference_samples)
             predictions = cast(GWPredictionsBase, pl_module(latent_groups))
-
             for logger in loggers:
                 for domains, preds in predictions["broadcasts"].items():
                     domain_from = ",".join(domains)
@@ -676,7 +747,6 @@ class LogGWImagesCallback(pl.Callback):
             or trainer.current_epoch % self.every_n_epochs != 0
         ):
             return
-
         return self.on_callback(trainer.loggers, pl_module)
 
     def on_validation_epoch_end(
@@ -743,10 +813,10 @@ class LogGWImagesCallback(pl.Callback):
                     pl_module.domain_mods["v_latents"],
                 )
                 self.log_visual_samples(logger, module.decode_images(samples), mode)
-            case "attr":
-                self.log_attribute_samples(logger, samples, mode)
-            case "act":
-                self.log_act_samples(logger, samples, mode)
+            #case "attr":
+            #    self.log_attribute_samples(logger, samples, mode)
+            #case "act":
+            #    self.log_act_samples(logger, samples, mode)
 
     def log_visual_samples(
         self,
@@ -764,7 +834,7 @@ class LogGWImagesCallback(pl.Callback):
         mode: str,
     ) -> None:
         images = make_grid(attr_to_image(samples.float()), nrow=4, pad_value=1)
-        log_image(logger, f"{self.log_key}_{mode}", images)
+        log_image(logger, f"{self.log_key}/{mode}", images)
 
     def log_act_samples(
         self,
@@ -773,4 +843,4 @@ class LogGWImagesCallback(pl.Callback):
         mode: str,
     ) -> None:
         images = make_grid(act_to_image(samples.float()), nrow=4, pad_value=1)
-        log_image(logger, f"{self.log_key}_{mode}", images)
+        log_image(logger, f"{self.log_key}/{mode}", images)

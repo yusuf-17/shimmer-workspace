@@ -51,7 +51,38 @@ DOMAIN_CONF : dict[str, str] = {
     "act" : "train_act.yaml",
 }
 
+def GW_sweep(
+        config_path: Path,
+        data_path : Path,
+        domain,
+        val_samples,
+        train_samples,
+        sweep,
+        debug_mode=None,
+        extra_config_files=None,
+        argv=None,
+        ):
+    LogCallback =  DEFAULT_CALLBACKS[domain]
+    
 
+    callbacks: list[pl.Callback] = [
+            LearningRateMonitor(logging_interval="step"),
+            LogCallback(
+                val_samples,
+                log_key="images/val_attr",
+                mode="val",
+                every_n_epochs=config.logging.log_val_medias_every_n_epochs,
+                ncols=8,
+            ),
+            LogCallback(
+                train_samples,
+                log_key="images/train_attr",
+                mode="train",
+                every_n_epochs=config.logging.log_train_medias_every_n_epochs,
+                #image_size=32,
+                ncols=8,
+            ),
+            ]
 
 def unimodal_sweep(
         config_path: Path,

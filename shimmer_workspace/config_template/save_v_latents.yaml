@@ -1,7 +1,13 @@
 domains:
-    - checkpoint_path: "/mnt/datashare/yelhelw/checkpoints/shimmer-meta-l7l0fpdu/epoch=152.ckpt"
+    #0.001 : "/mnt/datashare/yelhelw/checkpoints/shimmer-meta-ak5c6azb/epoch=30.ckpt"
+   #0.005exsh3uns/epoch=29.ckpt
+   #0 os1il439/epoch=30.ckpt
+   #0.1 670figk6/epoch=29.ckpt
+   #01fjh3xv/epoch=30.ckpt"  
+    - checkpoint_path: "/mnt/datashare/yelhelw/checkpoints/shimmer-meta-01fjh3xv/epoch=30.ckpt" 
       domain_type: 'v'
 # Path where we save checkpoints
 default_root_dir: "/mnt/datashare/yelhelw/checkpoints"
+
 
 

@@ -61,40 +61,35 @@ def train_visual_domain(
 
 
     pl.seed_everything(config.seed, workers=True)
-
-    #additional_transforms: dict[str, list[Callable[[Any], Any]]] = {}
-    #if config.domain_modules.visual.color_blind:
-    #    LOGGER.info("v domain will be color blind.")
-    #    additional_transforms["v"] = [color_blind_visual_domain]
-
+   
     data_module = MetaworldDataModule(
-        os.path.abspath('/mnt/datashare/yelhelw/expert_frames_final/'),
+        config.dataset.path,
         get_default_domains(["v"]),
         {frozenset(["v"]): 1.0},
         batch_size=128,
         num_workers=8,
     )
 
-
     #val_samples = data_module.get_samples("val", 32)[frozenset(["v"])]["v"]
     train_samples = []
     #train_samples = data_module.get_samples("train", 32)[frozenset(["v"])]["v"]
-    for r in range(320000,320032):
-        img = Image.open(f"/mnt/datashare/yelhelw/expert_frames_final/train/rand_env_{r}.png")
+    for r in range(0,0+(50*32),50):
+        img = Image.open(f"{config.dataset.path}/train/vision/{r:06d}.png")
         transform = transforms.ToTensor()
         train_samples.append(transform(img))
     train_samples = torch.stack(train_samples,dim=0)
 
     val_samples = []
-    for r in range(80241,80241+32):
-        img = Image.open(f"/mnt/datashare/yelhelw/expert_frames_final/val/rand_env_0{r}.png")
+    for r in range(0,0+(50*32),50):
+        img = Image.open(f"{config.dataset.path}/val/vision/{r:06d}.png")
         transform = transforms.ToTensor()
         val_samples.append(transform(img))
     val_samples = torch.stack(val_samples,dim=0)
-
-    for b in [0.05, 0.5, 1]:
+    latent_dim = 64
+    for b in [1.5]: #10e-6, 10e-2, 10e-1, 1.0]:
         print("########",b)
         v_domain_module = VisualDomainModule(
+            latent_dim=latent_dim,
             num_channels=config.domain_modules.visual.num_channels,
             optim_lr=config.training.optim.lr,
             beta=b,
@@ -112,14 +107,14 @@ def train_visual_domain(
             LearningRateMonitor(logging_interval="step"),
             LogVisualCallback(
                 val_samples,
-                log_key="images/val_attr",
+                log_key="images/val",
                 mode="val",
                 every_n_epochs=config.logging.log_val_medias_every_n_epochs,
                 ncols=8,
             ),
             LogVisualCallback(
                 train_samples,
-                log_key="images/train_attr",
+                log_key="images/train",
                 mode="train",
                 every_n_epochs=config.logging.log_train_medias_every_n_epochs,
                 ncols=8,
@@ -135,7 +130,7 @@ def train_visual_domain(
             if config.title is not None:
                 run_name = config.title
             else:
-                run_name = f"v_vae_z=16,b={b}"
+                run_name = f"v_complex_V3_sum_z={latent_dim},b={b}"
             wandb_kwargs: dict[str, Any] = {}
             if config.desc is not None:
                 wandb_kwargs["notes"] = config.desc
@@ -186,7 +181,7 @@ def train_visual_domain(
         )
 
         trainer.fit(v_domain_module, data_module)
-        trainer.validate(v_domain_module, data_module, "best")
+        #trainer.validate(v_domain_module, data_module, "best")
 
         wandb.finish()
 

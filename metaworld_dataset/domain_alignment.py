@@ -80,7 +80,7 @@ def get_aligned_datasets(
     domain_split = get_alignment(
         dataset_path, split, domain_proportions, seed, max_size
     )
-
+    
     datasets: dict[frozenset[str], Subset] = {}
     for domain_group, indices in domain_split.items():
         #I changed the if to domain_type.kind because I defined the splits by the kind (v_latents)
@@ -89,7 +89,6 @@ def get_aligned_datasets(
             for domain_type, domain_cls in domain_classes.items()
             if domain_type.kind in domain_group
         }
-        #print(sub_domain_cls,domain_group)
         
         dataset = MetaworldDataset(
             dataset_path,

@@ -11,16 +11,77 @@ from shimmer_metaworld.ckpt_migrations import (
 from shimmer_metaworld.config import DomainModuleVariant, LoadedDomainConfig
 from shimmer_metaworld.errors import ConfigurationError
 from shimmer_metaworld.modules.domains.attribute import (
-    AttributeDomainModule,
+    ActionDomainModule,
+    AttributeLegacyDomainModule,
     ActionLegacyDomainModule,
-    AttributeWithUnpairedDomainModule,
 )
-from shimmer_metaworld.modules.domains.text import GRUTextDomainModule, Text2Attr
 from shimmer_metaworld.modules.domains.visual import (
     VisualDomainModule,
     VisualLatentDomainModule,
     VisualLatentDomainWithUnpairedModule,
 )
+from torch import nn
+
+def get_n_layers(n_layers: int, hidden_dim: int) -> list[nn.Module]:
+    """
+    Makes a list of `n_layers` `nn.Linear` layers with `nn.ReLU`.
+
+    Args:
+        n_layers (`int`): number of layers
+        hidden_dim (`int`): size of the hidden dimension
+
+    Returns:
+        `list[nn.Module]`: list of linear and relu layers.
+    """
+    layers: list[nn.Module] = []
+    for _ in range(n_layers):
+        layers.extend([nn.Linear(hidden_dim, hidden_dim), nn.ReLU()])
+    return layers
+
+
+class ActDecoder(nn.Sequential):
+    """A Decoder network for GWModules."""
+
+    def __init__(
+        self,
+        in_dim: int,
+        hidden_dim: int,
+        out_dim: int,
+        n_layers: int,
+    ):
+        """
+        Initializes the decoder.
+
+        Args:
+            in_dim (`int`): input dimension
+            hidden_dim (`int`): hidden dimension
+            out_dim (`int`): output dimension
+            n_layers (`int`): number of hidden layers. The total number of layers
+                will be `n_layers` + 2 (one before, one after).
+        """
+
+        self.in_dim = in_dim
+        """input dimension"""
+
+        self.hidden_dim = hidden_dim
+        """hidden dimension"""
+
+        self.out_dim = out_dim
+        """output dimension"""
+
+        self.n_layers = n_layers
+        """
+        number of hidden layers. The total number of layers
+                will be `n_layers` + 2 (one before, one after)."""
+
+        super().__init__(
+            nn.Linear(self.in_dim, self.hidden_dim),
+            nn.ReLU(),
+            *get_n_layers(n_layers, self.hidden_dim),
+            nn.Linear(self.hidden_dim, self.out_dim),
+        )
+        self.q_mean = nn.Linear(self.out_dim, self.z_dim)
+        self.q_logvar = nn.Linear(self.out_dim, self.z_dim)
 
 
 def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
@@ -57,54 +118,33 @@ def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
             module = VisualLatentDomainWithUnpairedModule(v_module)
 
         case DomainModuleVariant.attr:
-            migrate_model(
-                domain_checkpoint,
-                PROJECT_DIR / "shimmer_metaworld" / "migrations" / "attr_mod",
-            )
-            module = AttributeDomainModule.load_from_checkpoint(
-                domain_checkpoint, **domain.args
-            )
-        case DomainModuleVariant.act:
-            module = ActionLegacyDomainModule()
-        
-        case DomainModuleVariant.attr_unpaired:
-            migrate_model(
-                domain_checkpoint,
-                PROJECT_DIR / "shimmer_metaworld" / "migrations" / "attr_mod",
-            )
-            module = AttributeWithUnpairedDomainModule.load_from_checkpoint(
-                domain_checkpoint, **domain.args
-            )
-
-        case DomainModuleVariant.attr_legacy:
             module = AttributeLegacyDomainModule()
-
-        case DomainModuleVariant.t:
-            module = GRUTextDomainModule.load_from_checkpoint(
-                domain_checkpoint, **domain.args, strict=False
-            )
-            # Freezes the projector
-            # module.embeddings.requires_grad_(False)
-            # module.projector.requires_grad_(False)
-
-        case DomainModuleVariant.t_attr:
-            assert (
-                "text_model_path" in domain.args
-            ), 'add "text_model_path" to the domain\'s args.'
-            text_model = GRUTextDomainModule.load_from_checkpoint(
-                domain.args["text_model_path"],
-                **domain.args.get("t_args", {}),
-            )
-            module = Text2Attr.load_from_checkpoint(
-                domain_checkpoint,
-                text_model=text_model,
-                **domain.args.get("model_args", {}),
-            )
+        
+        case DomainModuleVariant.act:
+         module = ActionLegacyDomainModule()
 
         case _:
             raise ConfigurationError(f"Unknown domain type {domain.domain_type.name}")
     return module
-
+'''
+    migrate_model(
+        domain_checkpoint,
+        PROJECT_DIR / "shimmer_metaworld" / "migrations" / "act_mod",
+    )
+    module = ActionDomainModule.load_from_checkpoint(
+        domain_checkpoint, **domain.args
+    )
+'''
+'''
+case DomainModuleVariant.attr:
+    migrate_model(
+        domain_checkpoint,
+        PROJECT_DIR / "shimmer_metaworld" / "migrations" / "attr_mod",
+    )
+    module = AttributeDomainModule.load_from_checkpoint(
+        domain_checkpoint, **domain.args
+    )
+'''
 
 def get_from_dict_or_val(
     val: int | Mapping[DomainModuleVariant, int], key: DomainModuleVariant, log: str
@@ -160,7 +200,15 @@ def load_pretrained_domain(
         )
 
     return module, gw_encoder, gw_decoder
-
+'''
+ elif isinstance(module, ActionLegacyDomainModule):
+        gw_encoder = GWEncoder(
+            module.latent_dim, encoder_hidden_dim, workspace_dim, encoder_n_layers
+        )
+        gw_decoder = ActDecoder(
+            workspace_dim, decoder_hidden_dim, module.latent_dim, decoder_n_layers
+        )
+'''
 
 def load_pretrained_domains(
     domains: Sequence[LoadedDomainConfig],

@@ -417,6 +417,33 @@ class ActionLegacyDomainModule(DomainModule):
     def forward(self, x: Sequence[torch.Tensor]) -> list[torch.Tensor]:  # type: ignore
         return self.decode(self.encode(x))
 
+class AttributeLegacyDomainModule(DomainModule):
+    latent_dim = 30
+
+    def __init__(self):
+        super().__init__(self.latent_dim)
+        self.save_hyperparameters()
+
+    def compute_loss(
+        self, pred: torch.Tensor, target: torch.Tensor, raw_target: Any
+    ) -> LossOutput:
+        pred  = self.decode(pred)
+        target  = self.decode(target)
+
+        loss = F.mse_loss(pred, target, reduction="mean")
+
+        return LossOutput(loss, metrics={"loss_act": loss})
+
+    def encode(self, x: Sequence[torch.Tensor]) -> torch.Tensor:
+        return x
+
+    def decode(self, z: torch.Tensor) -> list:
+        return z
+
+    def forward(self, x: Sequence[torch.Tensor]) -> list[torch.Tensor]:  # type: ignore
+        return self.decode(self.encode(x))
+
+
 class TactileDomainModule(DomainModule):
     latent_dim = 9
 

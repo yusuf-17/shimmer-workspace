@@ -4,19 +4,19 @@ from pathlib import Path
 from shimmer import DomainModule, GWDecoder, GWEncoder
 from torch.nn import Linear, Module
 
-from shimmer_metaworld import PROJECT_DIR
-from shimmer_metaworld.ckpt_migrations import (
+from shimmer_workspace import PROJECT_DIR
+from shimmer_workspace.ckpt_migrations import (
     migrate_model,
 )
-from shimmer_metaworld.config import DomainModuleVariant, LoadedDomainConfig
-from shimmer_metaworld.errors import ConfigurationError
-from shimmer_metaworld.modules.domains.attribute import (
+from shimmer_workspace.config import DomainModuleVariant, LoadedDomainConfig
+from shimmer_workspace.errors import ConfigurationError
+from shimmer_workspace.modules.domains.attribute import (
     AttributeDomainModule,
     AttributeLegacyDomainModule,
     ActionLegacyDomainModule,
     AttributeWithUnpairedDomainModule,
 )
-from shimmer_metaworld.modules.domains.visual import (
+from shimmer_workspace.modules.domains.visual import (
     VisualDomainModule,
     VisualLatentDomainModule,
     VisualLatentDomainWithUnpairedModule,
@@ -25,7 +25,7 @@ from shimmer_metaworld.modules.domains.visual import (
 from transformers import AutoImageProcessor, AutoModel
 from transformers.image_utils import load_image
 
-from shimmer_metaworld.modules.domains.dinov2_checkpoint import DINOv2FeatureExtractor
+from shimmer_workspace.modules.domains.dinov2_checkpoint import DINOv2FeatureExtractor
 
 def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
     domain_checkpoint = Path(domain.checkpoint_path)
@@ -34,7 +34,7 @@ def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
         case DomainModuleVariant.v:
             migrate_model(
                 domain_checkpoint,
-                PROJECT_DIR / "shimmer_metaworld" / "migrations" / "visual_mod",
+                PROJECT_DIR / "shimmer_workspace" / "migrations" / "visual_mod",
             )
             module = VisualDomainModule.load_from_checkpoint(
                 domain_checkpoint, **domain.args
@@ -45,7 +45,7 @@ def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
         case DomainModuleVariant.v_latents_unpaired:
             migrate_model(
                 domain_checkpoint,
-                PROJECT_DIR / "shimmer_metaworld" / "migrations" / "visual_mod",
+                PROJECT_DIR / "shimmer_workspace" / "migrations" / "visual_mod",
             )
             v_module = VisualDomainModule.load_from_checkpoint(
                 domain_checkpoint, **domain.args
@@ -60,7 +60,7 @@ def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
         case DomainModuleVariant.attr_unpaired:
             migrate_model(
                 domain_checkpoint,
-                PROJECT_DIR / "shimmer_metaworld" / "migrations" / "attr_mod",
+                PROJECT_DIR / "shimmer_workspace" / "migrations" / "attr_mod",
             )
             module = AttributeWithUnpairedDomainModule.load_from_checkpoint(
                 domain_checkpoint, **domain.args
@@ -188,19 +188,19 @@ from pathlib import Path
 from shimmer import DomainModule, GWDecoder, GWEncoder
 from torch.nn import Linear, Module
 
-from shimmer_metaworld import PROJECT_DIR
-from shimmer_metaworld.ckpt_migrations import (
+from shimmer_workspace import PROJECT_DIR
+from shimmer_workspace.ckpt_migrations import (
     migrate_model,
 )
-from shimmer_metaworld.config import DomainModuleVariant, LoadedDomainConfig
-from shimmer_metaworld.errors import ConfigurationError
-from shimmer_metaworld.modules.domains.attribute import (
+from shimmer_workspace.config import DomainModuleVariant, LoadedDomainConfig
+from shimmer_workspace.errors import ConfigurationError
+from shimmer_workspace.modules.domains.attribute import (
     AttributeDomainModule,
     AttributeLegacyDomainModule,
     ActionLegacyDomainModule,
     AttributeWithUnpairedDomainModule,
 )
-from shimmer_metaworld.modules.domains.visual import (
+from shimmer_workspace.modules.domains.visual import (
     VisualDomainModule,
     VisualLatentDomainModule,
     VisualLatentDomainWithUnpairedModule,
@@ -209,7 +209,7 @@ from shimmer_metaworld.modules.domains.visual import (
 from transformers import AutoImageProcessor, AutoModel
 from transformers.image_utils import load_image
 
-from shimmer_metaworld.modules.domains.dinov2_checkpoint import DINOv2FeatureExtractor
+from shimmer_workspace.modules.domains.dinov2_checkpoint import DINOv2FeatureExtractor
 
 def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
     domain_checkpoint = Path(domain.checkpoint_path)
@@ -218,7 +218,7 @@ def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
         case DomainModuleVariant.v:
             migrate_model(
                 domain_checkpoint,
-                PROJECT_DIR / "shimmer_metaworld" / "migrations" / "visual_mod",
+                PROJECT_DIR / "shimmer_workspace" / "migrations" / "visual_mod",
             )
             module = VisualDomainModule.load_from_checkpoint(
                 domain_checkpoint, **domain.args
@@ -229,7 +229,7 @@ def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
         case DomainModuleVariant.v_latents_unpaired:
             migrate_model(
                 domain_checkpoint,
-                PROJECT_DIR / "shimmer_metaworld" / "migrations" / "visual_mod",
+                PROJECT_DIR / "shimmer_workspace" / "migrations" / "visual_mod",
             )
             v_module = VisualDomainModule.load_from_checkpoint(
                 domain_checkpoint, **domain.args
@@ -244,7 +244,7 @@ def load_pretrained_module(domain: LoadedDomainConfig) -> DomainModule:
         case DomainModuleVariant.attr_unpaired:
             migrate_model(
                 domain_checkpoint,
-                PROJECT_DIR / "shimmer_metaworld" / "migrations" / "attr_mod",
+                PROJECT_DIR / "shimmer_workspace" / "migrations" / "attr_mod",
             )
             module = AttributeWithUnpairedDomainModule.load_from_checkpoint(
                 domain_checkpoint, **domain.args

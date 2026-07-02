@@ -8,8 +8,8 @@ from shimmer.modules.vae import VAE, gaussian_nll, kl_divergence_loss
 from torch.nn.functional import mse_loss
 from torch.optim.lr_scheduler import OneCycleLR
 
-from shimmer_metaworld import LOGGER
-from shimmer_metaworld.modules.vae import RAEDecoder, RAEEncoder
+from shimmer_workspace import LOGGER
+from shimmer_workspace.modules.vae import RAEDecoder, RAEEncoder
 
 
 class VisualDomainModule(DomainModule):

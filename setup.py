@@ -5,8 +5,5 @@ metaworld_dataset_path: str = (Path(__file__).parent / "metaworld_dataset").reso
 
 
 setup(
-    name = "meta_world",
-    install_requires=[
-        f"metaworld-dataset @{metaworld_dataset_path}",
-    ],
+    name = "shimmer_workspace",
 )

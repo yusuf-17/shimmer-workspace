@@ -20,7 +20,7 @@ from shimmer.version import __version__ as shimmer_version
 from metaworld_dataset import DomainType
 from typing_extensions import TypedDict
 
-from shimmer_metaworld import PROJECT_DIR
+from shimmer_workspace import PROJECT_DIR
 
 
 class DomainModuleVariant(Enum):

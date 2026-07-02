@@ -12,7 +12,7 @@ from migrate_ckpt import (
 )
 from shimmer import migrate_model as migrate_shimmer_model
 
-from shimmer_metaworld import LOGGER
+from shimmer_workspace import LOGGER
 
 
 def migrate_model(ckpt_path: str | PathLike, migration_path: str | PathLike, **kwargs):
